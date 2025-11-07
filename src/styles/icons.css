@@ -1,0 +1,165 @@
+/* Global Icon Styles for Font Awesome */
+
+/* Ensure all Font Awesome icons are visible */
+i.fas,
+i.far,
+i.fab,
+i.fa,
+svg.svg-inline--fa {
+  display: inline-block;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Font Awesome Icon Component Styles */
+.svg-inline--fa {
+  height: 1em;
+  vertical-align: -0.125em;
+}
+
+/* Search Icons */
+.search-icon {
+  color: #95a5a6;
+}
+
+.search-bar .search-icon {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+  pointer-events: none;
+}
+
+/* Add Button Icons */
+.add-btn svg,
+.add-btn i,
+.init-btn svg,
+.init-btn i,
+.refresh-btn svg,
+.refresh-btn i,
+.export-btn svg,
+.export-btn i,
+.reset-btn svg,
+.reset-btn i,
+.btn-reset svg,
+.btn-reset i {
+  font-size: 14px;
+  margin-right: 6px;
+}
+
+/* Action Button Icons */
+.edit-btn svg,
+.edit-btn i,
+.delete-btn svg,
+.delete-btn i,
+.btn-edit svg,
+.btn-edit i,
+.btn-delete svg,
+.btn-delete i,
+.btn-toggle svg,
+.btn-toggle i {
+  font-size: 14px;
+}
+
+/* Close Button Icons */
+.close-btn svg,
+.close-btn i {
+  font-size: 18px;
+}
+
+/* Status Icons */
+.status-icon svg,
+.status-icon i {
+  font-size: 20px;
+}
+
+/* Table Action Icons - Ensure they're visible */
+.actions-cell button svg,
+.actions-cell button i,
+.actions button svg,
+.actions button i,
+td.actions button svg,
+td.actions button i {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Icon colors for different contexts - Support both i and svg */
+.fa-plus,
+.fa-user-plus,
+.fa-user-tag,
+.fa-book-medical,
+.fa-search,
+.fa-filter,
+.fa-edit,
+.fa-trash,
+.fa-times,
+.fa-check,
+.fa-ban,
+svg.fa-plus,
+svg.fa-user-plus,
+svg.fa-user-tag,
+svg.fa-search,
+svg.fa-filter {
+  display: inline-block;
+}
+
+/* Filter and utility icons */
+.fa-filter,
+.fa-redo,
+.fa-sync-alt {
+  font-size: 14px;
+}
+
+/* Spinning icon animation - support both i and svg */
+.fa-spin,
+svg.fa-spin {
+  animation: fa-spin 1s infinite linear;
+}
+
+@keyframes fa-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Ensure buttons with icons have proper display */
+button svg,
+button i {
+  pointer-events: none;
+}
+
+/* Dashboard Icons */
+.stat-icon svg,
+.stat-icon i {
+  font-size: 32px;
+  color: white;
+}
+
+.action-icon {
+  font-size: 32px;
+  color: #667eea;
+}
+
+/* Admin Header Icons */
+.user-icon {
+  font-size: 18px;
+  color: #667eea;
+}
+
+.item-icon {
+  font-size: 16px;
+  color: #667eea;
+}
+
+.dropdown-arrow {
+  font-size: 12px;
+  color: #666;
+}
