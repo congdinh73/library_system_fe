@@ -408,9 +408,9 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 👥 Tác Giả
 
-- **Developer**: [Your Name]
-- **Email**: [your.email@example.com]
-- **GitHub**: [github.com/yourusername]
+- **Developer**: [Cong Dinh]
+- **Email**: [congdinh052@gmail.com.com]
+- **GitHub**: [github.com/congdinh73]
 
 ## 🙏 Cảm Ơn
 
