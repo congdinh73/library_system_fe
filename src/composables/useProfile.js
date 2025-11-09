@@ -94,12 +94,25 @@ export function useProfile() {
 
   /**
    * Check if loan is overdue
-   * @param {string} dueDate - Due date string
+   * @param {Object|string} loan - Loan object or due date string
    * @returns {boolean} true if overdue
    */
-  const isOverdue = (dueDate) => {
-    if (!dueDate) return false
-    return new Date(dueDate) < new Date()
+  const isOverdue = (loan) => {
+    // Nếu truyền vào là string (dueDate), giữ logic cũ
+    if (typeof loan === 'string') {
+      return loan ? new Date(loan) < new Date() : false
+    }
+    
+    // Nếu truyền vào là object, kiểm tra returnDate trước
+    if (typeof loan === 'object' && loan !== null) {
+      const returnDate = loan.returnDate || loan.return_date
+      if (returnDate) return false // Đã trả rồi thì không quá hạn
+      
+      const dueDate = loan.dueDate || loan.due_date
+      return dueDate ? new Date(dueDate) < new Date() : false
+    }
+    
+    return false
   }
 
   /**
@@ -190,9 +203,19 @@ export function useProfile() {
 
       // Calculate stats
       stats.value.totalBorrowed = loans.length
-      stats.value.currentBorrowing = loans.filter(loan => !loan.returnDate).length
-      stats.value.returned = loans.filter(loan => loan.returnDate).length
-      stats.value.overdue = loans.filter(loan => !loan.returnDate && isOverdue(loan.dueDate)).length
+      stats.value.currentBorrowing = loans.filter(loan => {
+        const returnDate = loan.returnDate || loan.return_date
+        return !returnDate
+      }).length
+      stats.value.returned = loans.filter(loan => {
+        const returnDate = loan.returnDate || loan.return_date
+        return !!returnDate
+      }).length
+      stats.value.overdue = loans.filter(loan => {
+        const returnDate = loan.returnDate || loan.return_date
+        if (returnDate) return false // Đã trả rồi
+        return isOverdue(loan) // Truyền cả object loan
+      }).length
     } catch (error) {
       console.error('Error loading stats:', error)
     } finally {

@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { booksAPI, categoriesAPI, publishersAPI, bookCategoriesAPI } from '@/services/apiEndpoints'
 import { handleApiError } from '@/utils/errorHandler'
 
@@ -49,56 +49,74 @@ export function useBooksManagement() {
   const bookToDelete = ref(null)
   const isDeleting = ref(false)
 
-  const filteredBooks = computed(() => {
-    let result = books.value
+  // Language mapping helper
+  const mapLanguageFilter = (filterLanguage) => {
+    const languageMap = {
+      'Tiếng Việt': ['Tiếng Việt', 'Vietnamese'],
+      'Tiếng Anh': ['English', 'Tiếng Anh'],
+      'Tiếng Pháp': ['French', 'Tiếng Pháp'],
+      'Tiếng Hoa': ['Chinese', 'Tiếng Hoa'],
+      'Tiếng Nhật': ['Japanese', 'Tiếng Nhật']
+    }
+    return languageMap[filterLanguage] || [filterLanguage]
+  }
 
-    // Apply search query
-    if (searchQuery.value.trim()) {
-      const query = searchQuery.value.toLowerCase().trim()
-      result = result.filter(book => {
-        const searchableText = [
-          book.title,
-          book.publisherName,
-          book.language,
-          book.edition,
-          book.publicationYear
-        ].filter(Boolean).join(' ').toLowerCase()
-        
-        return searchableText.includes(query)
-      })
+  const filteredBooks = computed(() => {
+    let result = [...books.value]
+
+    // Search by title or ISBN
+    if (searchQuery.value) {
+      const query = searchQuery.value.toLowerCase()
+      result = result.filter(book => 
+        book.title?.toLowerCase().includes(query) ||
+        book.isbn?.toLowerCase().includes(query)
+      )
     }
 
     // Apply filters
     if (filters.value.language) {
-      result = result.filter(book => book.language === filters.value.language)
+      const acceptedLanguages = mapLanguageFilter(filters.value.language)
+      result = result.filter(book => 
+        acceptedLanguages.some(lang => 
+          book.language?.toLowerCase() === lang.toLowerCase()
+        )
+      )
     }
 
     if (filters.value.publisherId) {
-      result = result.filter(book => book.publisherId === filters.value.publisherId)
+      result = result.filter(book => 
+        String(book.publisherId) === String(filters.value.publisherId)
+      )
     }
 
     if (filters.value.categoryId) {
       result = result.filter(book => 
-        book.categories && book.categories.some(cat => cat.categoryId === filters.value.categoryId)
+        book.categories && book.categories.some(cat => 
+          String(cat.categoryId) === String(filters.value.categoryId)
+        )
       )
     }
 
     if (filters.value.yearFrom) {
-      result = result.filter(book => book.publicationYear >= filters.value.yearFrom)
+      result = result.filter(book => {
+        const bookYear = parseInt(book.publicationYear)
+        const filterYear = parseInt(filters.value.yearFrom)
+        return bookYear >= filterYear
+      })
     }
 
     if (filters.value.yearTo) {
-      result = result.filter(book => book.publicationYear <= filters.value.yearTo)
+      result = result.filter(book => {
+        const bookYear = parseInt(book.publicationYear)
+        const filterYear = parseInt(filters.value.yearTo)
+        return bookYear <= filterYear
+      })
     }
 
-    if (filters.value.availability) {
-      if (filters.value.availability === 'available') {
-        result = result.filter(book => book.availableCopies > 0)
-      } else if (filters.value.availability === 'low') {
-        result = result.filter(book => book.availableCopies > 0 && book.availableCopies < 5)
-      } else if (filters.value.availability === 'out') {
-        result = result.filter(book => book.availableCopies === 0)
-      }
+    if (filters.value.availability === 'available') {
+      result = result.filter(book => book.availableQuantity > 0)
+    } else if (filters.value.availability === 'unavailable') {
+      result = result.filter(book => book.availableQuantity === 0)
     }
 
     return result
@@ -110,7 +128,8 @@ export function useBooksManagement() {
       filters.value.categoryId !== '' ||
       filters.value.yearFrom !== null ||
       filters.value.yearTo !== null ||
-      filters.value.availability !== ''
+      filters.value.availability !== '' ||
+      searchQuery.value.trim() !== ''
   })
 
   const activeFilterCount = computed(() => {
@@ -125,6 +144,8 @@ export function useBooksManagement() {
   })
 
   const resetFilters = () => {
+    searchQuery.value = ''
+    filteredCurrentPage.value = 0
     filters.value = {
       language: '',
       publisherId: '',
@@ -135,13 +156,44 @@ export function useBooksManagement() {
     }
   }
 
+  // Pagination for filtered results
+  const filteredCurrentPage = ref(0)
+  const filteredTotalPages = computed(() => {
+    if (!hasActiveFilters.value) return 0 // Không dùng filtered pagination khi không có filter
+    return Math.ceil(filteredBooks.value.length / pageSize.value)
+  })
+  
+  const paginatedBooks = computed(() => {
+    // Khi không có filter, hiển thị books từ API pagination
+    if (!hasActiveFilters.value) {
+      return books.value
+    }
+    
+    // Khi có filter, dùng client-side pagination
+    const start = filteredCurrentPage.value * pageSize.value
+    const end = start + pageSize.value
+    return filteredBooks.value.slice(start, end)
+  })
+
+  // Computed để quyết định dùng pagination nào
+  const shouldUseFilteredPagination = computed(() => hasActiveFilters.value)
+  const displayedTotalPages = computed(() => {
+    return shouldUseFilteredPagination.value ? filteredTotalPages.value : totalPages.value
+  })
+  const displayedCurrentPage = computed(() => {
+    return shouldUseFilteredPagination.value ? filteredCurrentPage.value : currentPage.value
+  })
+
   const visiblePages = computed(() => {
     const pages = []
     const maxVisible = 5
-    let start = Math.max(0, currentPage.value - Math.floor(maxVisible / 2))
-    let end = Math.min(totalPages.value, start + maxVisible)
+    const currentPageValue = displayedCurrentPage.value
+    const totalPagesValue = displayedTotalPages.value
     
-    if (end - start < maxVisible) {
+    let start = Math.max(0, currentPageValue - Math.floor(maxVisible / 2))
+    let end = Math.min(totalPagesValue, start + maxVisible)
+    
+    if (end - start < maxVisible && totalPagesValue >= maxVisible) {
       start = Math.max(0, end - maxVisible)
     }
     
@@ -218,8 +270,6 @@ export function useBooksManagement() {
       }
       
       console.log('📚 Total categories loaded:', categories.value.length)
-      console.log('📚 First category object:', categories.value[0])
-      console.log('📚 All categories:', categories.value)
     } catch (error) {
       console.error('Error loading categories:', error)
       errorMessage.value = handleApiError(error, 'Không thể tải danh sách thể loại')
@@ -236,6 +286,7 @@ export function useBooksManagement() {
       } else {
         publishers.value = []
       }
+      console.log('🏢 Publishers loaded:', publishers.value.length)
     } catch (error) {
       console.error('Error loading publishers:', error)
       errorMessage.value = handleApiError(error, 'Không thể tải danh sách nhà xuất bản')
@@ -276,10 +327,23 @@ export function useBooksManagement() {
   }
 
   const goToPage = (page) => {
-    if (page >= 0 && page < totalPages.value) {
-      loadBooks(page)
+    if (shouldUseFilteredPagination.value) {
+      // Navigate filtered pagination
+      if (page >= 0 && page < filteredTotalPages.value) {
+        filteredCurrentPage.value = page
+      }
+    } else {
+      // Navigate API pagination
+      if (page >= 0 && page < totalPages.value) {
+        loadBooks(page)
+      }
     }
   }
+
+  // Watch for filter changes to reset pagination
+  watch([filters, searchQuery], () => {
+    filteredCurrentPage.value = 0
+  }, { deep: true })
 
   const editBook = (book) => {
     form.value = {
@@ -518,6 +582,12 @@ export function useBooksManagement() {
     bookToDelete,
     isDeleting,
     filteredBooks,
+    paginatedBooks,
+    filteredCurrentPage,
+    filteredTotalPages,
+    displayedCurrentPage,
+    displayedTotalPages,
+    shouldUseFilteredPagination,
     hasActiveFilters,
     activeFilterCount,
     visiblePages,

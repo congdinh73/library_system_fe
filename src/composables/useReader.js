@@ -89,6 +89,21 @@ export function useReader() {
   }
 
   /**
+   * Check if loan is overdue
+   * @param {Object} loan - Loan object
+   * @returns {boolean} true if overdue
+   */
+  const isLoanOverdue = (loan) => {
+    if (!loan) return false
+    
+    const returnDate = loan.returnDate || loan.return_date
+    if (returnDate) return false // Đã trả rồi thì không quá hạn
+    
+    const dueDate = loan.dueDate || loan.due_date
+    return dueDate ? new Date(dueDate) < new Date() : false
+  }
+
+  /**
    * Load books with pagination
    * @param {number} page - Page number (0-based)
    */
@@ -295,6 +310,7 @@ export function useReader() {
     visiblePages,
     showToast,
     formatDate,
+    isLoanOverdue,
     loadBooks,
     loadMyLoans,
     handleSearch,

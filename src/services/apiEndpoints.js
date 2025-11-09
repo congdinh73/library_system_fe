@@ -1,5 +1,22 @@
 import apiService from './api'
 
+// Helper function to build query string safely
+const buildQueryString = (params) => {
+  if (!params || typeof params !== 'object' || Object.keys(params).length === 0) {
+    return ''
+  }
+  
+  const searchParams = new URLSearchParams()
+  
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== null && value !== undefined && value !== '') {
+      searchParams.append(key, value.toString())
+    }
+  })
+  
+  return searchParams.toString()
+}
+
 // Authentication API
 export const authAPI = {
   login(credentials) {
@@ -121,19 +138,19 @@ export const readersAPI = {
 export const loansAPI = {
   // Lấy tất cả lịch sử mượn sách của user hiện tại
   getMyLoans(params = {}) {
-    const queryString = new URLSearchParams(params).toString()
+    const queryString = buildQueryString(params)
     return apiService.get(`/loans/my-loans${queryString ? `?${queryString}` : ''}`)
   },
 
   // Lấy danh sách sách đang mượn (chưa trả) của user hiện tại
   getMyActiveLoans(params = {}) {
-    const queryString = new URLSearchParams(params).toString()
+    const queryString = buildQueryString(params)
     return apiService.get(`/loans/my-active-loans${queryString ? `?${queryString}` : ''}`)
   },
 
   // Lấy danh sách mượn sách (admin/librarian)
   getAll(params = {}) {
-    const queryString = new URLSearchParams(params).toString()
+    const queryString = buildQueryString(params)
     return apiService.get(`/loans${queryString ? `?${queryString}` : ''}`)
   },
 

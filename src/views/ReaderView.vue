@@ -113,17 +113,56 @@
         </button>
       </div>
 
+      <!-- Overdue Books Section -->
+      <div v-if="overdueLoans.length > 0" class="my-loans-section overdue-section">
+        <h2 class="overdue-title">
+          <font-awesome-icon :icon="['fas', 'exclamation-triangle']" class="warning-icon" />
+          Sách Quá Hạn ({{ overdueLoans.length }})
+        </h2>
+        <div class="loans-list">
+          <div v-for="loan in overdueLoans" :key="loan.id" class="loan-item overdue-item">
+            <div class="loan-book-info">
+              <font-awesome-icon :icon="['fas', 'book-open']" class="book-icon" />
+              <div>
+                <h4>{{ loan.bookTitle }}</h4>
+                <p class="loan-dates">
+                  <font-awesome-icon :icon="['fas', 'calendar-check']" class="date-icon" />
+                  Ngày mượn: {{ formatDate(loan.borrowDate) }} | 
+                  <font-awesome-icon :icon="['fas', 'calendar-xmark']" class="date-icon" />
+                  Quá hạn từ: {{ formatDate(loan.dueDate) }}
+                </p>
+                <div class="overdue-info">
+                  <font-awesome-icon :icon="['fas', 'clock']" class="warning-icon" />
+                  <span class="overdue-text">Đã quá hạn {{ getOverdueDays(loan.dueDate) }} ngày</span>
+                </div>
+              </div>
+            </div>
+            <div class="loan-actions">
+              <button
+                @click="handleReturn(loan)"
+                :disabled="loan.isReturning"
+                class="return-btn urgent"
+              >
+                <font-awesome-icon v-if="loan.isReturning" :icon="['fas', 'spinner']" spin />
+                <font-awesome-icon v-else :icon="['fas', 'undo']" />
+                {{ loan.isReturning ? 'Đang xử lý...' : 'Trả ngay' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- My Loans Section -->
       <div class="my-loans-section">
-        <h2>Sách Đang Mượn</h2>
+        <h2>Sách Đang Mượn ({{ activeLoans.length }})</h2>
         <div v-if="isLoadingLoans" class="loading-small">
           <div class="spinner-small"></div>
         </div>
-        <div v-else-if="myLoans.length === 0" class="empty-state">
-          <p>Bạn chưa mượn sách nào</p>
+        <div v-else-if="activeLoans.length === 0" class="empty-state">
+          <p>{{ myLoans.length === 0 ? 'Bạn chưa mượn sách nào' : 'Tất cả sách đều đã quá hạn' }}</p>
         </div>
         <div v-else class="loans-list">
-          <div v-for="loan in myLoans" :key="loan.id" class="loan-item">
+          <div v-for="loan in activeLoans" :key="loan.id" class="loan-item">
             <div class="loan-book-info">
               <font-awesome-icon :icon="['fas', 'book-open']" class="book-icon" />
               <div>
@@ -134,6 +173,10 @@
                   <font-awesome-icon :icon="['fas', 'calendar-xmark']" class="date-icon" />
                   Hạn trả: {{ formatDate(loan.dueDate) }}
                 </p>
+                <div v-if="isLoanOverdue(loan)" class="overdue-warning">
+                  <font-awesome-icon :icon="['fas', 'exclamation-triangle']" class="warning-icon" />
+                  <span class="warning-text">Sách đã quá hạn!</span>
+                </div>
               </div>
             </div>
             <div class="loan-actions">
@@ -169,7 +212,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, computed } from 'vue'
 import { useReader } from '@/composables/useReader'
 import ReaderHeader from '@/components/ReaderHeader.vue'
 
@@ -190,12 +233,32 @@ const {
   filteredBooks,
   visiblePages,
   formatDate,
+  isLoanOverdue,
   handleSearch,
   goToPage,
   handleBorrow,
   handleReturn,
   handleExtend
 } = readerComposable
+
+// Separate overdue and active loans
+const overdueLoans = computed(() => {
+  return myLoans.value.filter(loan => isLoanOverdue(loan))
+})
+
+const activeLoans = computed(() => {
+  return myLoans.value.filter(loan => !isLoanOverdue(loan))
+})
+
+// Calculate overdue days
+const getOverdueDays = (dueDate) => {
+  if (!dueDate) return 0
+  const due = new Date(dueDate)
+  const today = new Date()
+  const diffTime = today - due
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  return diffDays > 0 ? diffDays : 0
+}
 
 // Lifecycle
 onMounted(() => {

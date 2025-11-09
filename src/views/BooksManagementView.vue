@@ -45,7 +45,7 @@
             <label>Nhà xuất bản</label>
             <select v-model="filters.publisherId">
               <option value="">Tất cả</option>
-              <option v-for="pub in publishers" :key="pub.publisherId" :value="pub.publisherId">
+              <option v-for="pub in publishers" :key="pub.publisherId || pub.id" :value="pub.publisherId || pub.id">
                 {{ pub.name }}
               </option>
             </select>
@@ -55,7 +55,7 @@
             <label>Thể loại</label>
             <select v-model="filters.categoryId">
               <option value="">Tất cả</option>
-              <option v-for="cat in categories" :key="cat.categoryId" :value="cat.categoryId">
+              <option v-for="cat in categories" :key="cat.categoryId || cat.id" :value="cat.categoryId || cat.id">
                 {{ cat.name }}
               </option>
             </select>
@@ -102,7 +102,24 @@
 
       <!-- Books Grid -->
       <div v-else class="books-grid">
-        <div v-for="book in filteredBooks" :key="book.id" class="book-card">
+        <!-- No Results State -->
+        <div v-if="filteredBooks.length === 0 && !isLoading" class="no-results">
+          <div class="no-results-icon">
+            <font-awesome-icon :icon="['fas', 'search']" />
+          </div>
+          <h3>Không tìm thấy sách nào</h3>
+          <p v-if="hasActiveFilters || searchQuery">
+            Không có sách nào phù hợp với bộ lọc hiện tại.
+            <br>
+            <button @click="resetFilters" class="reset-filters-btn">Xóa bộ lọc</button>
+          </p>
+          <p v-else>
+            Chưa có sách nào trong hệ thống.
+          </p>
+        </div>
+        
+        <!-- Books Cards -->
+        <div v-for="book in paginatedBooks" :key="book.id" class="book-card">
           <div class="book-header">
             <div class="book-icon">
               <font-awesome-icon :icon="['fas', 'book']" />
@@ -143,10 +160,10 @@
       </div>
 
       <!-- Pagination -->
-      <div v-if="!isLoading && !errorMessage && totalPages > 1" class="pagination">
+      <div v-if="!isLoading && !errorMessage && displayedTotalPages > 1" class="pagination">
         <button
-          @click="goToPage(currentPage - 1)"
-          :disabled="currentPage === 0"
+          @click="goToPage(displayedCurrentPage - 1)"
+          :disabled="displayedCurrentPage === 0"
           class="pagination-btn"
         >
           ← Trước
@@ -157,15 +174,15 @@
             v-for="page in visiblePages"
             :key="page"
             @click="goToPage(page)"
-            :class="['pagination-number', { active: currentPage === page }]"
+            :class="['pagination-number', { active: displayedCurrentPage === page }]"
           >
             {{ page + 1 }}
           </button>
         </div>
         
         <button
-          @click="goToPage(currentPage + 1)"
-          :disabled="currentPage >= totalPages - 1"
+          @click="goToPage(displayedCurrentPage + 1)"
+          :disabled="displayedCurrentPage >= displayedTotalPages - 1"
           class="pagination-btn"
         >
           Sau →
@@ -197,7 +214,14 @@
           <div class="form-row">
             <div class="form-group">
               <label>Ngôn ngữ <span class="required">*</span></label>
-              <input v-model="form.language" type="text" required placeholder="Tiếng Việt, English, etc." />
+              <select v-model="form.language" required>
+                <option value="">Chọn ngôn ngữ</option>
+                <option value="Tiếng Việt">Tiếng Việt</option>
+                <option value="English">English</option>
+                <option value="French">French</option>
+                <option value="Chinese">Chinese</option>
+                <option value="Japanese">Japanese</option>
+              </select>
             </div>
             <div class="form-group">
               <label>Phiên bản <span class="required">*</span></label>
@@ -303,6 +327,12 @@ const {
   bookToDelete,
   isDeleting,
   filteredBooks,
+  paginatedBooks,
+  filteredCurrentPage,
+  filteredTotalPages,
+  displayedCurrentPage,
+  displayedTotalPages,
+  shouldUseFilteredPagination,
   hasActiveFilters,
   activeFilterCount,
   visiblePages,

@@ -77,7 +77,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { readersAPI } from '@/services/apiEndpoints'
+import { readersAuthAPI } from '@/services/apiEndpoints'
 
 const router = useRouter()
 
@@ -110,14 +110,20 @@ const handleResetPassword = async () => {
   isLoading.value = true
 
   try {
+    // Backend yêu cầu confirmPassword field
     const resetData = {
       refreshToken: formData.value.token,
-      newPassword: formData.value.password
+      newPassword: formData.value.password,
+      confirmPassword: formData.value.confirmPassword, // Field bắt buộc
+      // Backup field names
+      token: formData.value.token,
+      password: formData.value.password
     }
 
     console.log('🔍 Sending reset password request')
+    console.log('📤 Request data:', resetData)
     
-    const response = await readersAPI.resetPassword(resetData)
+    const response = await readersAuthAPI.resetPassword(resetData)
     
     console.log('✅ Reset password response:', response)
 
@@ -129,6 +135,11 @@ const handleResetPassword = async () => {
     }, 2000)
   } catch (error) {
     console.error('❌ Reset password error:', error)
+    console.error('📄 Error details:', {
+      status: error.status,
+      data: error.data,
+      message: error.message
+    })
     
     if (error.status === 400) {
       errorMessage.value = error.data?.message || 'Mã khôi phục không hợp lệ hoặc đã hết hạn'

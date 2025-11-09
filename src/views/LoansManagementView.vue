@@ -6,8 +6,10 @@
             <div class="page-header">
         <h1>Quản lý Mượn Trả Sách</h1>
         <div class="header-actions">
-          <button @click="exportToCSV" class="export-btn" :disabled="loans.length === 0">
-            <font-awesome-icon :icon="['fas', 'file-csv']" /> Xuất CSV
+          <button @click="exportToCSV" class="export-btn" :disabled="isExporting">
+            <font-awesome-icon v-if="isExporting" :icon="['fas', 'spinner']" spin />
+            <font-awesome-icon v-else :icon="['fas', 'file-csv']" />
+            {{ isExporting ? 'Đang xuất...' : 'Xuất CSV' }}
           </button>
         </div>
       </div>
@@ -18,7 +20,7 @@
           <label>Trạng thái:</label>
           <select v-model="filters.status" @change="applyFilters">
             <option value="">Tất cả</option>
-            <option value="ACTIVE">Đang mượn</option>
+            <option value="BORROWED">Đang mượn</option>
             <option value="RETURNED">Đã trả</option>
             <option value="OVERDUE">Quá hạn</option>
           </select>
@@ -40,7 +42,7 @@
             type="text" 
             v-model="filters.search" 
             placeholder="Tên độc giả, tên sách, email..."
-            @input="applyFilters"
+            @input="debouncedApplyFilters"
           />
         </div>
 
@@ -61,7 +63,6 @@
         <table class="loans-table">
           <thead>
             <tr>
-              <th>ID</th>
               <th>Độc giả</th>
               <th>Email</th>
               <th>Sách</th>
@@ -74,24 +75,44 @@
           </thead>
           <tbody>
             <tr v-if="filteredLoans.length === 0">
-              <td colspan="9" class="no-data">Không có dữ liệu</td>
+              <td colspan="8" class="no-data">Không có dữ liệu</td>
             </tr>
-            <tr v-for="loan in filteredLoans" :key="loan.loanId">
-              <td>{{ loan.loanId }}</td>
-              <td class="reader-name">{{ loan.reader?.fullName || 'N/A' }}</td>
-              <td>{{ loan.reader?.email || 'N/A' }}</td>
-              <td class="book-title">{{ loan.book?.title || 'N/A' }}</td>
-              <td>{{ formatDate(loan.loanDate) }}</td>
-              <td>{{ formatDate(loan.dueDate) }}</td>
-              <td>{{ loan.returnDate ? formatDate(loan.returnDate) : '-' }}</td>
+            <tr v-for="loan in filteredLoans" :key="loan.loanId || loan.id">
+              <td class="reader-name">{{ 
+                loan.reader?.fullName || 
+                loan.reader?.name || 
+                loan.readerName || 
+                loan.reader_name || 
+                'N/A' 
+              }}</td>
+              <td>{{ 
+                loan.reader?.email || 
+                loan.readerEmail || 
+                loan.reader_email || 
+                'N/A' 
+              }}</td>
+              <td class="book-title">{{ 
+                loan.book?.title || 
+                loan.bookTitle || 
+                loan.book_title || 
+                'N/A' 
+              }}</td>
+              <td>{{ 
+                formatDate(loan.loanDate || loan.borrowDate || loan.borrow_date) 
+              }}</td>
+              <td>{{ formatDate(loan.dueDate || loan.due_date) }}</td>
+              <td>{{ 
+                loan.returnDate || loan.return_date ? 
+                formatDate(loan.returnDate || loan.return_date) : '-' 
+              }}</td>
               <td>
                 <span :class="['status-badge', getStatusClass(loan)]">
                   {{ getStatusText(loan) }}
                 </span>
               </td>
               <td>
-                <span v-if="loan.fine > 0" class="fine-amount">
-                  {{ formatCurrency(loan.fine) }}
+                <span v-if="(loan.fineAmount || loan.fine || 0) > 0" class="fine-amount">
+                  {{ formatCurrency(loan.fineAmount || loan.fine || 0) }}
                 </span>
                 <span v-else class="no-fine">-</span>
               </td>
@@ -127,40 +148,42 @@
       <div v-if="!isLoading" class="summary-cards">
         
         <div class="summary-card">
-          <div class="card-icon">
+          <div class="card-icon total-icon">
             <font-awesome-icon :icon="['fas', 'chart-bar']" />
           </div>
           <div class="card-content">
             <h3>Tổng số giao dịch</h3>
-            <p class="card-number">{{ totalElements }}</p>
+            <p class="card-number">{{ statistics.total }}</p>
           </div>
-        </div>        <div class="summary-card">
-          <div class="card-icon">
+        </div>        
+
+        <div class="summary-card">
+          <div class="card-icon active-icon">
             <font-awesome-icon :icon="['fas', 'book-open']" />
           </div>
           <div class="card-content">
             <h3>Đang mượn</h3>
-            <p class="card-number">{{ getStatusCount('ACTIVE') }}</p>
+            <p class="card-number">{{ statistics.borrowed }}</p>
           </div>
         </div>
         
         <div class="summary-card">
-          <div class="card-icon">
+          <div class="card-icon returned-icon">
             <font-awesome-icon :icon="['fas', 'check-circle']" />
           </div>
           <div class="card-content">
             <h3>Đã trả</h3>
-            <p class="card-number">{{ getStatusCount('RETURNED') }}</p>
+            <p class="card-number">{{ statistics.returned }}</p>
           </div>
         </div>
         
         <div class="summary-card">
-          <div class="card-icon">
+          <div class="card-icon overdue-icon">
             <font-awesome-icon :icon="['fas', 'exclamation-triangle']" />
           </div>
           <div class="card-content">
             <h3>Quá hạn</h3>
-            <p class="card-number">{{ getStatusCount('OVERDUE') }}</p>
+            <p class="card-number">{{ statistics.overdue }}</p>
           </div>
         </div>
       </div>
@@ -169,12 +192,13 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import AdminHeader from '@/components/AdminHeader.vue'
 import { useAuthError } from '@/composables/useAuthError'
 import { useLoansManagement } from '@/composables/useLoansManagement'
 
 const { handleAuthError } = useAuthError()
+const isExporting = ref(false)
 
 const loansManagement = useLoansManagement()
 
@@ -186,22 +210,41 @@ const {
   totalPages,
   totalElements,
   filters,
+  statistics,
   filteredLoans,
-  applyFilters,
-  resetFilters,
   getStatusClass,
   getStatusText,
   getStatusCount,
   formatDate,
-  formatCurrency,
-  exportToCSV
+  formatCurrency
 } = loansManagement
 
 const fetchLoans = (page) => loansManagement.fetchLoans(page, handleAuthError)
+const fetchStatistics = () => loansManagement.fetchStatistics(handleAuthError)
 const changePage = (page) => loansManagement.changePage(page, handleAuthError)
+const applyFilters = () => loansManagement.applyFilters(handleAuthError)
+const resetFilters = () => loansManagement.resetFilters(handleAuthError)
+const exportToCSV = async () => {
+  isExporting.value = true
+  try {
+    await loansManagement.exportToCSV(handleAuthError)
+  } finally {
+    isExporting.value = false
+  }
+}
+
+// Debounce function for search
+let searchTimeout = null
+const debouncedApplyFilters = () => {
+  if (searchTimeout) clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    applyFilters()
+  }, 500) // 500ms delay
+}
 
 onMounted(() => {
   fetchLoans()
+  fetchStatistics()
 })
 </script>
 

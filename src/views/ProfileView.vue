@@ -137,7 +137,15 @@
             <font-awesome-icon :icon="['fas', 'lock']" />
             Đổi mật khẩu
           </button>
-          <button @click="showEditProfile = true" class="action-btn secondary">
+          <button 
+            v-if="stats.overdue > 0" 
+            @click="showOverdueBooks = true" 
+            class="action-btn warning"
+          >
+            <font-awesome-icon :icon="['fas', 'exclamation-triangle']" />
+            Trả sách quá hạn ({{ stats.overdue }})
+          </button>
+          <button @click="showEditProfile = true" class="action-btn secondary">`
             <font-awesome-icon :icon="['fas', 'edit']" />
             Chỉnh sửa thông tin
           </button>
@@ -172,17 +180,17 @@
                   <font-awesome-icon :icon="['fas', 'calendar-check']" />
                   Mượn: {{ formatDate(loan.borrowDate) }}
                 </span>
-                <span v-if="loan.returnDate">
+                <span v-if="loan.returnDate || loan.return_date">
                   <font-awesome-icon :icon="['fas', 'check']" />
-                  Trả: {{ formatDate(loan.returnDate) }}
+                  Trả: {{ formatDate(loan.returnDate || loan.return_date) }}
                 </span>
-                <span v-else-if="isOverdue(loan.dueDate)" class="overdue">
+                <span v-else-if="isOverdue(loan)" class="overdue">
                   <font-awesome-icon :icon="['fas', 'exclamation-triangle']" />
                   Quá hạn
                 </span>
                 <span v-else>
                   <font-awesome-icon :icon="['fas', 'calendar-xmark']" />
-                  Hạn: {{ formatDate(loan.dueDate) }}
+                  Hạn: {{ formatDate(loan.dueDate || loan.due_date) }}
                 </span>
               </div>
             </div>
@@ -190,6 +198,76 @@
         </div>
       </div>
     </main>
+
+    <!-- Overdue Books Modal -->
+    <div v-if="showOverdueBooks" class="modal-overlay" @click="showOverdueBooks = false">
+      <div class="modal-content modal-large" @click.stop>
+        <div class="modal-header">
+          <h3>Sách Quá Hạn Cần Trả</h3>
+          <button @click="showOverdueBooks = false" class="close-btn">
+            <font-awesome-icon :icon="['fas', 'times']" />
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div v-if="isLoadingLoans" class="loading-center">
+            <div class="spinner"></div>
+            <p>Đang tải dữ liệu...</p>
+          </div>
+
+          <div v-else-if="overdueBooks.length === 0" class="empty-state">
+            <font-awesome-icon :icon="['fas', 'check-circle']" class="empty-icon" />
+            <p>Bạn không có sách quá hạn nào!</p>
+          </div>
+
+          <div v-else>
+            <!-- Overdue Books List -->
+            <div class="loans-list">
+              <div v-for="loan in overdueBooks" :key="loan.id || loan.loanId || loan.loan_id" class="loan-item overdue-item">
+                <div class="loan-book">
+                  <h4>{{ loan.bookTitle || loan.book?.title }}</h4>
+                  <p class="book-author">{{ loan.bookAuthor || loan.book?.author }}</p>
+                </div>
+                <div class="loan-dates">
+                  <div class="date-item">
+                    <span class="date-label">
+                      <font-awesome-icon :icon="['fas', 'calendar-plus']" />
+                      Ngày mượn
+                    </span>
+                    <span class="date-value">{{ formatDate(loan.borrowDate || loan.loanDate) }}</span>
+                  </div>
+                  <div class="date-item">
+                    <span class="date-label">
+                      <font-awesome-icon :icon="['fas', 'calendar-xmark']" />
+                      Đã quá hạn từ
+                    </span>
+                    <span class="date-value overdue-date">{{ formatDate(loan.dueDate) }}</span>
+                  </div>
+                  <div class="date-item">
+                    <span class="date-label">
+                      <font-awesome-icon :icon="['fas', 'clock']" />
+                      Số ngày quá hạn
+                    </span>
+                    <span class="date-value overdue-days">{{ getOverdueDays(loan.dueDate) }} ngày</span>
+                  </div>
+                </div>
+                <div class="loan-actions">
+                  <button 
+                    @click="handleReturnOverdueBook(loan)"
+                    :disabled="loan.isReturning"
+                    class="action-btn warning"
+                  >
+                    <font-awesome-icon v-if="loan.isReturning" :icon="['fas', 'spinner']" spin />
+                    <font-awesome-icon v-else :icon="['fas', 'undo']" />
+                    {{ loan.isReturning ? 'Đang trả...' : 'Trả sách ngay' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- All Loans Modal -->
     <div v-if="showAllLoans" class="modal-overlay" @click="showAllLoans = false">
@@ -235,20 +313,20 @@
                     </span>
                     <span class="date-value">{{ formatDate(loan.dueDate) }}</span>
                   </div>
-                  <div class="date-item" v-if="loan.returnDate">
+                  <div class="date-item" v-if="loan.returnDate || loan.return_date">
                     <span class="date-label">
                       <font-awesome-icon :icon="['fas', 'calendar-check']" />
                       Đã trả
                     </span>
-                    <span class="date-value">{{ formatDate(loan.returnDate) }}</span>
+                    <span class="date-value">{{ formatDate(loan.returnDate || loan.return_date) }}</span>
                   </div>
                 </div>
                 <div class="loan-status">
-                  <span v-if="loan.returnDate" class="status returned">
+                  <span v-if="loan.returnDate || loan.return_date" class="status returned">
                     <font-awesome-icon :icon="['fas', 'check']" />
                     Đã trả
                   </span>
-                  <span v-else-if="isOverdue(loan.dueDate)" class="status overdue">
+                  <span v-else-if="isOverdue(loan)" class="status overdue">
                     <font-awesome-icon :icon="['fas', 'exclamation-triangle']" />
                     Quá hạn
                   </span>
@@ -368,9 +446,10 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProfile } from '@/composables/useProfile'
+import { loansAPI } from '@/services/apiEndpoints'
 
 const router = useRouter()
 
@@ -407,6 +486,68 @@ const {
 
 const goBack = () => router.back()
 const handleLogout = () => profileComposable.handleLogout(router)
+
+// Additional state for overdue books
+const showOverdueBooks = ref(false)
+const overdueBooks = computed(() => {
+  return recentLoans.value.filter(loan => {
+    const returnDate = loan.returnDate || loan.return_date
+    if (returnDate) return false
+    return isOverdue(loan)
+  })
+})
+
+// Calculate overdue days
+const getOverdueDays = (dueDate) => {
+  if (!dueDate) return 0
+  const due = new Date(dueDate)
+  const today = new Date()
+  const diffTime = today - due
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  return diffDays > 0 ? diffDays : 0
+}
+
+// Handle return overdue book
+const handleReturnOverdueBook = async (loan) => {
+  if (loan.isReturning) return
+  
+  // Debug loan structure
+  console.log('🔍 Loan object:', loan)
+  
+  const loanId = loan.id || loan.loanId || loan.loan_id
+  if (!loanId) {
+    console.error('❌ No valid loan ID found:', loan)
+    profileComposable.showToast('Không thể xác định ID của sách. Vui lòng thử lại.', 'error')
+    return
+  }
+  
+  loan.isReturning = true
+  try {
+    const returnData = {
+      returnDate: new Date().toISOString().split('T')[0]
+    }
+    
+    console.log('📤 Returning loan:', loanId, returnData)
+    await loansAPI.returnBook(loanId, returnData)
+    
+    // Reload data
+    profileComposable.loadRecentLoans()
+    profileComposable.loadStats()
+    
+    // Show success toast
+    profileComposable.showToast('Trả sách thành công!', 'success')
+    
+    // Close modal if no more overdue books
+    if (overdueBooks.value.length <= 1) {
+      showOverdueBooks.value = false
+    }
+  } catch (error) {
+    console.error('❌ Error returning book:', error)
+    profileComposable.showToast('Không thể trả sách. Vui lòng thử lại.', 'error')
+  } finally {
+    loan.isReturning = false
+  }
+}
 
 // Open all loans modal and load first page
 const openAllLoansModal = async () => {
